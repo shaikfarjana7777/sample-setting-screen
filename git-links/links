@@ -1,0 +1,438 @@
+https://github.com/shaikfarjana7777/PROJECT-1
+scrapping the data from the image using flask ,pytesseract and PIL modules
+https://github.com/shaikfarjana7777/flipkart-img-extract
+scrapping the images and their data from the flipkart site and storing the information in MySQL database
+https://github.com/shaikfarjana7777/backend_intern_assignment
+https://github.com/shaikfarjana7777/API-responce
+https://github.com/shaikfarjana7777/watchfinder
+https://github.com/shaikfarjana7777/scheduling-data
+https://github.com/shaikfarjana7777/NLTK_MODULE
+It contains text processing such as tokenization, stemming, lemmatization, POS tagging, parsing, and sentiment analysis.
+https://github.com/shaikfarjana7777/automating-webform
+automating the web form and filling the data, submitting the form, and finally waiting for the confirmation page by using Selenium and web drivers
+
+
+
+1. yeah definetly i will prioritize the work
+2. offcourse , i will always learn new things and i can work extra hours also
+3. during my acadamic career i gained experience in python and its libraries
+4. server is nothing but a computer that provides services to the clients , to reach the server we need to    
+    connect to the internet  ,we can use webbrowsers to access the server
+5. ssh username@server_ip_address we want to replace the uesrname and ip adress
+6. pg_dump -U shaikfarjana -d student_data -f student.sql
+
+
+
+1. i am expecting my career to be in a good position that i can be able to help four people around  along              
+   with that gaining experience and improve my knowledge to meet the company success
+2. staying connection with social media is very important nowadays it helps me always stay up to date              
+    everytime
+3.  https://github.com/shaikfarjana7777/PROJECT1
+     the above project contains scrapping the data from the image using flask ,pytesseract and PIL modules
+     explanation:
+                         ' when the user give images like adhar card or pan card etc it exatract the data from it return  
+                          it as json data as output.'
+    "when i am doing this  small project i really felt very interesting in working with images and extarcting the     
+     data from them " 
+4.  when i am trying for an internship i have applied for several company's and i have compleated their 
+     assignments too but i didn't get any response from them at some times i felt very dissappointed but u         
+     know what i didn't stop trying finally i got internship from the company synthiem
+5. i didn't visited any like that
+6. yeah definetly i can relocate to  Hyderabad/Secunderabad
+
+
+
+from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from flask_bcrypt import Bcrypt
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:aspen123@localhost/Project'  # Replace with your MySQL credentials
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = '@123@'  # Change this to your own secret key
+app.config['JWT_SECRET_KEY'] = '#123#'  # Change this to your own JWT secret key
+
+db = SQLAlchemy(app)
+bcrypt = Bcrypt(app)
+jwt = JWTManager(app)
+
+
+# Database models
+class User(db.Model):
+    __tablename__ = 'user'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password = db.Column(db.String(80), nullable=False)
+    todos = db.relationship('Todo', backref='user', lazy=True)
+
+
+class Todo(db.Model):
+    __tablename__ = 'todo'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    completed = db.Column(db.Boolean, default=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+
+# API endpoints
+@app.route('/api/register', methods=['POST'])
+def register():
+    username = request.json.get('username')
+    password = request.json.get('password')
+
+    if not username or not password:
+        return jsonify({'message': 'Missing username or password'}), 400
+
+    existing_user = User.query.filter_by(username=username).first()
+    if existing_user:
+        return jsonify({'message': 'Username already exists'}), 400
+
+    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+    new_user = User(username=username, password=hashed_password)
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify({'message': 'User created successfully'}), 201
+
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    username = request.json.get('username')
+    password = request.json.get('password')
+
+    if not username or not password:
+        return jsonify({'message': 'Missing username or password'}), 400
+
+    user = User.query.filter_by(username=username).first()
+    if not user or not bcrypt.check_password_hash(user.password, password):
+        return jsonify({'message': 'Invalid username or password'}), 401
+
+    access_token = create_access_token(identity=user.id)
+    return jsonify({'access_token': access_token}), 200
+
+
+@app.route('/api/todo', methods=['GET'])
+@jwt_required()
+def get_todos():
+    user_id = get_jwt_identity()
+    todos = Todo.query.filter_by(user_id=user_id).all()
+    todo_list = [{'id': todo.id, 'title': todo.title, 'completed': todo.completed} for todo in todos]
+    return jsonify(todo_list), 200
+
+
+@app.route('/api/todo', methods=['POST'])
+@jwt_required()
+def create_todo():
+    user_id = get_jwt_identity()
+    title = request.json.get('title')
+
+    if not title:
+        return jsonify({'message': 'Missing title'}), 400
+
+    new_todo = Todo(title=title, user_id=user_id)
+    db.session.add(new_todo)
+    db.session.commit()
+
+    return jsonify({'message': 'Todo created successfully'}), 201
+
+
+@app.route('/api/todo/<int:todo_id>', methods=['PUT'])
+@jwt_required()
+def update_todo(todo_id):
+    user_id = get_jwt_identity()
+    todo = Todo.query.filter_by(id=todo_id, user_id=user_id).first()
+
+    if not todo:
+        return jsonify({'message': 'Todo not found'}), 404
+
+    title = request.json.get('title')
+    completed = request.json.get('completed')
+
+    if title:
+        todo.title = title
+
+    if completed is not None:
+        todo.completed = completed
+
+    db.session.commit()
+
+    return jsonify({'message': 'Todo updated successfully'}), 200
+
+if __name__ == '__main__':
+    app.run(debug=True)
+    
+    
+    
+     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 180,
+    borderRadius: 9,
+    elevation: 10,
+    backgroundColor: 'pink',
+    
+    
+    
+    
+
+
+
+from flask import Flask, request, jsonify,render_template
+from flask_bcrypt import Bcrypt
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+import mysql.connector
+SECRET_KEY = 'farjana'  # Set the secret key values
+JWT_SECRET_KEY = 'farooq'
+
+app = Flask(__name__)
+
+app.config['SECRET_KEY'] = SECRET_KEY
+app.config['JWT_SECRET_KEY'] = JWT_SECRET_KEY
+bcrypt = Bcrypt(app)
+jwt = JWTManager(app)
+
+# MySQL Connection
+mydb = mysql.connector.connect(
+  host="localhost",
+  user="root",
+  password="aspen123",
+  database="Project"
+)
+mycursor = mydb.cursor()
+
+
+# Database models
+class User:
+    def __init__(self, id, username, password):
+        self.id = id
+        self.username = username
+        self.password = password
+
+
+class Todo:
+    def __init__(self, id, title, completed, user_id):
+        self.id = id
+        self.title = title
+        self.completed = completed
+        self.user_id = user_id
+
+
+# API endpoints
+@app.route('/api/register', methods=['POST'])
+def register():
+    username = request.json.get('username')
+    password = request.json.get('password')
+
+    if not username or not password:
+        return jsonify({'message': 'Missing username or password'}), 400
+
+    existing_user_query = "SELECT * FROM user WHERE username = %s"
+    mycursor.execute(existing_user_query, (username,))
+    existing_user = mycursor.fetchone()
+    if existing_user:
+        return jsonify({'message': 'Username already exists'}), 400
+
+    hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
+
+    new_user_query = "INSERT INTO user (username, password) VALUES (%s, %s)"
+    mycursor.execute(new_user_query, (username, hashed_password))
+    mydb.commit()
+    return render_template('Home.html')
+    #return jsonify({'message': 'User created successfully'}), 201
+
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    username = request.json.get('username')
+    password = request.json.get('password')
+
+    if not username or not password:
+        return jsonify({'message': 'Missing username or password'}), 400
+
+    user_query = "SELECT * FROM user WHERE username = %s"
+    mycursor.execute(user_query, (username,))
+    user = mycursor.fetchone()
+
+    if not user or not bcrypt.check_password_hash(user[2], password):
+        return jsonify({'message': 'Invalid username or password'}), 401
+
+    access_token = create_access_token(identity=user[0])
+    return jsonify({'access_token': access_token}), 200
+
+
+@app.route('/api/todo', methods=['GET'])
+@jwt_required()
+def get_todos():
+    user_id = get_jwt_identity()
+    todos_query = "SELECT * FROM todo WHERE user_id = %s"
+    mycursor.execute(todos_query, (user_id,))
+    todos = mycursor.fetchall()
+
+    todo_list = [{'id': todo[0], 'title': todo[1], 'completed': bool(todo[2])} for todo in todos]
+    return jsonify(todo_list), 200
+
+
+@app.route('/api/todo', methods=['POST'])
+@jwt_required()
+def create_todo():
+    user_id = get_jwt_identity()
+    title = request.json.get('title')
+
+    if not title:
+        return jsonify({'message': 'Missing title'}), 400
+
+    new_todo_query = "INSERT INTO todo (title, completed, user_id) VALUES (%s, %s, %s)"
+    mycursor.execute(new_todo_query, (title, False, user_id))
+    mydb.commit()
+
+    return jsonify({'message': 'Todo created successfully'}), 201
+
+
+@app.route('/api/todo/<int:todo_id>', methods=['PUT'])
+@jwt_required()
+def update_todo(todo_id):
+    user_id = get_jwt_identity()
+
+    todo_query = "SELECT * FROM todo WHERE id = %s AND user_id = %s"
+    mycursor.execute(todo_query, (todo_id, user_id))
+    todo = mycursor.fetchone()
+
+    if not todo:
+        return jsonify({'message': 'Todo not found'}), 404
+
+    title = request.json.get('title')
+    completed = request.json.get('completed')
+
+    update_todo_query = "UPDATE todo SET title = %s, completed = %s WHERE id = %s"
+    update_values = (title, completed, todo_id) if title or completed else None
+    mycursor.execute(update_todo_query, update_values)
+    mydb.commit()
+
+    return jsonify({'message': 'Todo updated successfully'}), 200
+
+@app.route('/api/todo/<int:todo_id>', methods=['DELETE'])
+@jwt_required()
+def delete_todo(todo_id):
+    user_id = get_jwt_identity()
+
+    todo_query = "SELECT * FROM todo WHERE id = %s AND user_id = %s"
+    mycursor.execute(todo_query, (todo_id, user_id))
+    todo = mycursor.fetchone()
+
+    if not todo:
+        return jsonify({'message': 'Todo not found'}), 404
+
+    delete_todo_query = "DELETE FROM todo WHERE id = %s"
+    mycursor.execute(delete_todo_query, (todo_id,))
+    mydb.commit()
+
+    return jsonify({'message': 'Todo deleted successfully'}), 200
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Authenticated ToDo App</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+    <style>
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .btn-login {
+            background-color: #007bff;
+            color: #fff;
+        }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1 class="header">Authenticated ToDo App</h1>
+<div id="login-form">
+    <h2>Login</h2>
+    <form id="login-form" action="/api/login" method="POST">
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <input type="text" class="form-control" id="username" name="username" required>
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" class="form-control" id="password" name="password" required>
+        </div>
+        <button type="submit" class="btn btn-login">Login</button>
+    </form>
+</div>
+</div>
+
+
+max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            color:rgb(250, 248, 250) ;
+            background-color:rgb(65, 8, 65);
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            
+IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+
+
+I am excited to apply for this internship program . As a recent graduate with a degree in bachelors of computers application (data structures and data analytics)and a passion for Python programming, I am confident in my ability to contribute to your team's success.During my academic career, I gained experience in developing Python applications, and I am familiar with libraries such as Flask . Additionally, I have experience working with HTML, CSS, and basics of JavaScript, which I believe will enable me to contribute to the development of web applications.I am confident that my skills make me an ideal candidate for this position.
+        
+            
+///////////////////////////////////////////////////////////////////////////////////////////
+
+https://github.com/shaikfarjana7777/Authenticated-TODO-App
+https://github.com/shaikfarjana7777/backend_intern_assignment
+https://github.com/shaikfarjana7777/API-responce
+https://github.com/shaikfarjana7777/PROJECT-1
+
+//////////
+RAM ==> free -h , CPU==> lscpu  /
+ ///////// 
+ 
+  PYTHON FLASK ==>
+____________________
+https://github.com/shaikfarjana7777/Authenticated-TODO-App
+https://github.com/shaikfarjana7777/backend_intern_assignment
+https://github.com/shaikfarjana7777/API-responce
+https://github.com/shaikfarjana7777/PROJECT-1
+FIGMA ==>
+__________
+https://www.figma.com/file/ga2kZ8IPpL1kww3vhOuPxm/Appcamp?type=design&node-id=0%3A1&mode=design&t=HrDmz7zgWHXvgPZX-1
+
+RESPONSIVE UI WITH AUTHENTICATED TO DO APP ==>
+__________________________________________________________
+https://www.loom.com/share/63c20cf288a24cfbb0f45d059feaf250?sid=03992c91-12e6-44e2-a018-55cea35dad69
+
+
+I am excited to apply for this internship program . As a recent graduate with a degree in bachelors of computers application and a passion for Python programming, I am confident in my ability to contribute to your team's success.During my academic career, I gained experience in developing Python applications, and I am familiar with libraries such as Flask webscrapping using selenium and beatifullsoup . Additionally, I have experience working with HTML, CSS, and basics of JavaScript,Node.js which I believe will enable me to contribute to the development of web applications.I am confident that my skills make me an ideal candidate for this position 
+
+==>you can check my works on Github
+  https://github.com/shaikfarjana7777
+==> along with that i have recently done a project for TODO app with authentication
+
+https://www.loom.com/share/63c20cf288a24cfbb0f45d059feaf250?sid=03992c91-12e6-44e2-a018-55cea35dad69 
+
+Thank you and Looking forward to hearing from you soon!
+
+
+            //<TouchableOpacity onPress={() => navigation.navigate('Medication')}> //   
+      
